@@ -29,17 +29,28 @@ class LLMResponse(BaseModel):
 class ModelConfig:
     """单路模型配置。"""
 
+    # 模型 ID，会作为 OpenAI 兼容接口的 model 参数。
     model_id: str
+    # 调用该模型服务所需的 API Key。
     api_key: str
+    # 自定义 OpenAI 兼容服务地址；为空时使用 SDK 默认地址。
     base_url: str | None = None
+    # 模型提供方类型，当前主要用于后续扩展不同供应商适配。
     provider: ModelProvider = ModelProvider.OPENAI
+    # 路由优先级，数字越小越优先。
     priority: int = 0
+    # 同优先级内的加权随机权重，权重越大越容易被优先尝试。
     weight: float = 1.0
+    # 预留扩展配置，例如区域、成本、超时等模型元信息。
     extra: dict[str, Any] = field(default_factory=dict)
 
 
 class ModelRouter:
-    """多模型路由器：支持优先级调度、负载均衡（同优先级加权随机）、自动降级。"""
+    """多模型路由器。
+
+    统一管理多个 OpenAI 兼容模型客户端，并在调用时按优先级、权重和熔断状态
+    选择可用模型。上层只需要提交消息列表，不必关心具体模型的降级与重试顺序。
+    """
 
     def __init__(
         self,
@@ -51,6 +62,7 @@ class ModelRouter:
         if not model_configs:
             raise ValueError("model_configs 不能为空")
 
+        # 优先级数字越小越靠前；后续候选模型选择会在这个顺序基础上分组。
         self._configs = sorted(model_configs, key=lambda c: c.priority)
         self._breakers: dict[str, CircuitBreaker] = {}
         for cfg in self._configs:
@@ -61,6 +73,7 @@ class ModelRouter:
             )
         self._clients: dict[str, AsyncOpenAI] = {}
         for cfg in self._configs:
+            # 每个模型维护独立客户端，方便支持不同 API Key 或 OpenAI 兼容 base_url。
             kwargs: dict[str, Any] = {"api_key": cfg.api_key}
             if cfg.base_url:
                 kwargs["base_url"] = cfg.base_url
@@ -70,7 +83,11 @@ class ModelRouter:
         self,
         model_preference: str | None,
     ) -> list[ModelConfig]:
-        """按优先级分组，在同优先级内按权重随机排序，形成候选列表。"""
+        """形成本次请求的候选模型列表。
+
+        如果指定的模型存在，则尊重显式偏好；否则先按优先级排序，再在同优先级
+        内使用加权随机，避免同一优先级下的流量总是打到固定模型。
+        """
         if model_preference:
             exact = [c for c in self._configs if c.model_id == model_preference]
             if exact:
@@ -98,13 +115,18 @@ class ModelRouter:
         model_preference: str | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
-        """智能路由到合适模型；失败时按候选顺序自动降级。"""
+        """路由到合适模型，失败时按候选顺序自动降级。
+
+        每个模型调用都经过独立熔断器：连续失败的模型会被快速跳过，恢复窗口
+        之后再进入半开状态试探。
+        """
         candidates = self._select_candidates(model_preference)
         last_error: Exception | None = None
 
         for cfg in candidates:
             breaker = self._breakers[cfg.model_id]
             try:
+                # 记录模型调用成功或失败
                 return await breaker.call(
                     self._try_model,
                     cfg.model_id,
@@ -133,11 +155,16 @@ class ModelRouter:
         messages: list[dict[str, Any]],
         **kwargs: Any,
     ) -> LLMResponse:
-        """尝试调用指定模型（经熔断器包装，不在此处重复熔断逻辑）。"""
+        """调用指定模型并转换为统一响应结构。
+
+        这里只负责 OpenAI 兼容接口请求和响应归一化；熔断、降级和候选选择由
+        外层 ``chat`` 方法负责。
+        """
         client = self._clients[model_id]
         temperature = kwargs.pop("temperature", 0.7)
         max_tokens = kwargs.pop("max_tokens", None)
 
+        # 保留 kwargs 扩展口，允许上层透传 stop、top_p 等 OpenAI 兼容参数。
         params: dict[str, Any] = {
             "model": model_id,
             "messages": messages,

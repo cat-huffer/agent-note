@@ -5,12 +5,13 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import AsyncIterator
+from typing import AsyncIterator, cast
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from openai import AsyncOpenAI
+from openai.types.chat import ChatCompletionMessageParam
 
 from app.config import get_settings
 from app.core.intent.recognizer import IntentRecognizer
@@ -107,7 +108,10 @@ async def _stream_generator(
         api_key=settings.openai_api_key,
         base_url=settings.openai_api_base or None,
     )
-    messages = [m.model_dump() for m in request.messages]
+    messages = cast(
+        list[ChatCompletionMessageParam],
+        [m.model_dump() for m in request.messages],
+    )
     model = request.model or settings.openai_model
 
     try:

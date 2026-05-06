@@ -61,3 +61,8 @@ select = ["E", "F", "I", "UP"]
 python_version = "3.11"
 strict = false
 ignore_missing_imports = true
+
+# 让 Pylance/Pyright 使用项目内 .venv，从而解析第三方包（如 openai）
+[tool.pyright]
+venvPath = "."
+venv = ".venv"

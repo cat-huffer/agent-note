@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""全链路追踪：内存存储 Span 树与查询接口。"""
+"""
+全链路追踪：内存存储 Span 树与查询接口。
+
+trace 是“整条链路”，span 是链路里每一个“步骤节点”
+"""
 
 from __future__ import annotations
 
@@ -14,13 +18,12 @@ from loguru import logger
 
 @dataclass
 class TraceSpan:
-    """单次操作 Span。"""
+    """单次操作 Span。比如：调用模型、查数据库、执行工具、执行策略等"""
 
     span_id: str
     trace_id: str
     operation: str
-    parent_span_id: str | None
-    start_time: float
+    parent_span_id: str | None # 父 Span 的 ID
     end_time: float | None = None
     result: dict[str, Any] | None = None
     error: str | None = None

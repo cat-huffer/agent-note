@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 from typing import Any, Protocol, runtime_checkable
 
+# 导入 OpenAI 常用的分词/计 token 库。
 import tiktoken
 from loguru import logger
 
