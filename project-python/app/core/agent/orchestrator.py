@@ -172,7 +172,21 @@ class AgentOrchestrator:
         mode: str = "react",
         intent: Optional[IntentContext] = None,
     ) -> AgentResponse:
-        """执行 Agent 编排：集成记忆、工具、追踪与可选反思。"""
+        """
+        单次对话入口：按 mode 走 ReAct 或 Plan-and-Execute，串联记忆与工具，并打点 trace。
+
+        若 ``intent.preferred_mode`` 存在则覆盖 ``mode``。Plan 失败且配置允许时会降级为 ReAct。
+        开启反思时会在有答案后附加反思报告；反思失败仅记录日志，不影响主流程。
+
+        Args:
+            user_input: 用户本轮输入。
+            session_id: 会话标识（记忆、追踪关联用）。
+            mode: ``react`` 或 ``plan_execute``，默认 ReAct。
+            intent: 意图与工具白名单等；省略时使用默认 ``IntentContext``。
+
+        Returns:
+            ``AgentResponse``：最终回答、实际使用的模式、步骤快照、trace_id、可选反思与错误信息。
+        """
         intent_ctx = intent or IntentContext()
         if intent_ctx.preferred_mode:
             mode = intent_ctx.preferred_mode  # 意图优先
@@ -285,6 +299,7 @@ class AgentOrchestrator:
         llm = _LLMAdapter(self._model_router.get_llm("react"))
         max_steps = int(self._config.get("react_max_steps", 10))
 
+        # 异步回调，用于在 ReAct 执行过程中记录每一步的追踪信息
         async def trace_cb(rec: Dict[str, Any]) -> None:
             payload = {"ts": time.time(), **rec}
             steps.append(payload)

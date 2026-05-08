@@ -183,6 +183,7 @@ class ReActAgent:
         mem_snippets: List[str] = []
         if self._memory is not None:
             try:
+                # 从历史记忆里找出最相关的最多 8 条片段
                 mem_snippets = await self._memory.get_relevant(session_id, query, limit=8)
             except Exception as e:  # noqa: BLE001
                 logger.warning("读取记忆失败，将继续无记忆上下文: %s", e)
