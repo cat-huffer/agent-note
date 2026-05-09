@@ -16,37 +16,37 @@ logger = logging.getLogger(__name__)
 
 REFLECTION_SYSTEM_PROMPT = """你是严格的输出质量审查员。请对用户问题与助手回答进行审查。
 
-## 你必须只输出一个 JSON 对象，格式如下：
-{
-  "quality_score": 0-100 的整数,
-  "is_complete": true/false,
-  "likely_hallucination": true/false,
-  "hallucination_reasons": ["若怀疑幻觉，列出具体疑点；否则为空数组"],
-  "completeness_notes": "是否遗漏关键要点",
-  "suggestions": ["可执行的改进建议，面向助手"],
-  "summary": "一句中文总结审查结论"
-}
+    ## 你必须只输出一个 JSON 对象，格式如下：
+    {
+    "quality_score": 0-100 的整数,
+    "is_complete": true/false,
+    "likely_hallucination": true/false,
+    "hallucination_reasons": ["若怀疑幻觉，列出具体疑点；否则为空数组"],
+    "completeness_notes": "是否遗漏关键要点",
+    "suggestions": ["可执行的改进建议，面向助手"],
+    "summary": "一句中文总结审查结论"
+    }
 
-审查标准：
-- 幻觉：回答是否包含无依据的具体事实、虚构来源或与用户问题无关的断言。
-- 完整性：是否覆盖用户问题的核心子问题。
-- 质量分：综合考虑正确性、清晰度与有用性。
-"""
+    审查标准：
+    - 幻觉：回答是否包含无依据的具体事实、虚构来源或与用户问题无关的断言。
+    - 完整性：是否覆盖用户问题的核心子问题。
+    - 质量分：综合考虑正确性、清晰度与有用性。
+    """
 
 
 @dataclass
 class ReflectionReport:
     """反思审查报告。"""
 
-    quality_score: int
-    is_complete: bool
-    likely_hallucination: bool
-    hallucination_reasons: List[str]
-    completeness_notes: str
-    suggestions: List[str]
-    summary: str
-    raw_model_output: Optional[str] = None
-    parse_error: Optional[str] = None
+    quality_score: int  # 质量总分（0-100），综合正确性、清晰度与有用性。
+    is_complete: bool  # 是否覆盖了用户问题的核心要点。
+    likely_hallucination: bool  # 是否疑似存在幻觉或无依据断言。
+    hallucination_reasons: List[str]  # 幻觉判定依据；无幻觉时通常为空列表。
+    completeness_notes: str  # 对完整性的文字说明（遗漏点/覆盖情况）。
+    suggestions: List[str]  # 面向助手的可执行改进建议。
+    summary: str  # 一句话审查结论摘要。
+    raw_model_output: Optional[str] = None  # 模型原始输出，便于排查解析或提示词问题。
+    parse_error: Optional[str] = None  # 解析失败时的错误信息；成功时为 None。
 
 
 class ReflectionLLM(Protocol):
@@ -91,18 +91,18 @@ class ReflectionAgent:
         ev_block = "\n".join(f"- {s}" for s in (evidence_snippets or [])) or "（无外部证据）"
         trace_block = trace_summary or "（无轨迹）"
         user_content = f"""## 用户问题
-{user_query}
+            {user_query}
 
-## 助手回答
-{agent_answer}
+            ## 助手回答
+            {agent_answer}
 
-## 外部证据/观察片段
-{ev_block}
+            ## 外部证据/观察片段
+            {ev_block}
 
-## 执行轨迹摘要
-{trace_block}
+            ## 执行轨迹摘要
+            {trace_block}
 
-请输出 JSON 审查结果。"""
+            请输出 JSON 审查结果。"""
 
         messages: Sequence[Dict[str, str]] = [
             {"role": "system", "content": REFLECTION_SYSTEM_PROMPT},

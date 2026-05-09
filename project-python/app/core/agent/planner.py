@@ -18,38 +18,37 @@ logger = logging.getLogger(__name__)
 
 PLAN_SYSTEM_PROMPT = """你是任务规划专家。请将用户目标拆分为有序、可执行的子任务列表。
 
-## 输出格式（仅输出 JSON，不要其他文字）
-{
-  "subtasks": [
+    ## 输出格式（仅输出 JSON，不要其他文字）
     {
-      "id": "t1",
-      "title": "子任务标题",
-      "description": "具体要做什么",
-      "action_type": "tool|reasoning",
-      "tool_name": "若 action_type 为 tool 则填写工具名，否则 null",
-      "tool_args_hint": "工具参数要点（自然语言提示）"
+    "subtasks": [
+        {
+        "id": "t1",
+        "title": "子任务标题",
+        "description": "具体要做什么",
+        "action_type": "tool|reasoning",
+        "tool_name": "若 action_type 为 tool 则填写工具名，否则 null",
+        "tool_args_hint": "工具参数要点（自然语言提示）"
+        }
+    ]
     }
-  ]
-}
 
-规则：
-- action_type 为 reasoning 表示主要依赖模型推理整合，无需调用工具。
-- 子任务数量建议 2～8 个，避免过细或过粗。
-- id 必须唯一。
-"""
-
+    规则：
+    - action_type 为 reasoning 表示主要依赖模型推理整合，无需调用工具。
+    - 子任务数量建议 2～8 个，避免过细或过粗。
+    - id 必须唯一。
+    """
 
 REPLAN_SYSTEM_PROMPT = """你是任务规划专家。根据已执行结果与错误信息，修订后续计划。
 
-## 输出格式（仅输出 JSON）
-{
-  "subtasks": [ ... 同上结构 ... ],
-  "notes": "简要说明为何如此调整"
-}
+    ## 输出格式（仅输出 JSON）
+    {
+    "subtasks": [ ... 同上结构 ... ],
+    "notes": "简要说明为何如此调整"
+    }
 
-若任务已完成，返回：
-{ "subtasks": [], "notes": "已完成，原因说明" }
-"""
+    若任务已完成，返回：
+    { "subtasks": [], "notes": "已完成，原因说明" }
+    """
 
 
 @dataclass
@@ -86,6 +85,12 @@ def _extract_json_object(text: str) -> Dict[str, Any]:
 
 
 def _parse_subtasks(data: Dict[str, Any]) -> List[SubTask]:
+    """
+    从规划结果字典中解析 `subtasks`，并转换为 `SubTask` 列表。
+
+    仅处理字典类型条目；缺失字段会使用默认值补齐（如默认 `id`、空标题、
+    默认 `action_type=reasoning`），用于屏蔽上游输出噪声并统一内部结构。
+    """
     raw_list = data.get("subtasks") or []
     out: List[SubTask] = []
     for item in raw_list:

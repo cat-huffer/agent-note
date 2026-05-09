@@ -20,7 +20,15 @@ class RAGLLMProtocol(Protocol):
 
 
 class RAGGenerator:
-    """RAG 答案生成器：基于检索到的上下文生成答案，支持引用标注。"""
+    """
+    RAG 答案生成器，负责把“问题 + 检索结果 + 对话历史”转成最终可返回的回答对象。
+
+    主要做两件事：
+    1) 生成答案：将检索上下文按 [1]/[2] 编号组织进提示词，连同系统提示与历史对话一起发送给 LLM。
+    2) 生成引用：从模型回答中提取形如 [n] 的引用标记，并映射回对应的检索结果，产出结构化 Citation。
+
+    最终输出为 RAGResponse，包含回答文本、引用列表、原始上下文以及可选模型名，便于前端展示与追溯。
+    """
 
     def __init__(
         self,
@@ -77,7 +85,22 @@ class RAGGenerator:
         ]
 
     def _extract_citations(self, answer: str, contexts: list[RetrievalResult]) -> list[Citation]:
-        """从回答中解析 [n] 引用并映射到 RetrievalResult。"""
+        """
+        从模型回答里抽取形如 ``[1]``、``[2]`` 的引用标记，并与检索结果列表按编号对齐，生成结构化 ``Citation`` 列表。
+
+        流程说明：
+
+        1. 用 ``re.findall`` 匹配回答中所有 ``[`` 与 ``]`` 之间的正整数编号，得到按出现顺序的编号序列（同一编号可出现多次）。
+        2. 按该顺序遍历编号；若编号已处理过、小于 1、或大于 ``len(contexts)``，则跳过（越界或重复引用不会写入结果）。
+        3. 对有效编号 ``idx``，取 ``contexts[idx - 1]``（与 ``_build_messages`` 里 ``[1]`` 起始于 1 的约定一致），构造 ``Citation``：
+           ``index`` 为引用编号，``result_id`` 为对应条目的 ``id``，``snippet`` 为 ``content`` 前 200 字符，超长时追加 ``...``。
+
+        注意：本方法只做“标记 → 检索条”的机械映射，不校验回答内容与片段是否语义一致；若回答中出现非引用用途的 ``[数字]``，也会被当作引用解析。
+
+        :param answer: 模型生成的回答正文，其中可含 ``[n]`` 引用（``n`` 为正整数）。
+        :param contexts: 与提示词中 ``[1]``、``[2]`` … 顺序一致的检索结果列表；空列表时任何编号均视为越界而不会产出引用。
+        :returns: 按在回答中**首次出现**顺序排列的 ``Citation`` 列表；无有效标记或全部被过滤时为空列表。
+        """
         refs = [int(x) for x in re.findall(r"\[(\d+)\]", answer)]
         citations: list[Citation] = []
         seen: set[int] = set()

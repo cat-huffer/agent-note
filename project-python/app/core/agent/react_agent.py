@@ -180,7 +180,13 @@ class ReActAgent:
         tool_names: List[str] = list(context.get("tool_names") or [])
         extra_system = str(context.get("extra_system", ""))
 
+        # 用来累积每一轮 ReAct 的步骤记录，包括：
+        # - 步骤索引
+        # - 阶段（llm 或 react）
+        # - 原始 LLM 输出
+        # - 解析后的动作、输入、观察结果
         steps: List[Dict[str, Any]] = []
+        # 用来累积每一轮 ReAct 的「思考 + 动作 + 观察」文本，供下一轮（及之后）拼进 prompt
         history_lines: List[str] = []
 
         mem_snippets: List[str] = []
@@ -191,6 +197,7 @@ class ReActAgent:
             except Exception as e:  # noqa: BLE001
                 logger.warning("读取记忆失败，将继续无记忆上下文: %s", e)
 
+        # 整理成一段可直接写进 system prompt 的文本
         mem_block = "\n".join(f"- {s}" for s in mem_snippets) if mem_snippets else "（无）"
 
         for step_idx in range(self.max_steps):
@@ -239,6 +246,7 @@ class ReActAgent:
                     await trace_cb(rec)
                 if self._memory is not None:
                     try:
+                        # 异步往记忆里追加一条「对话轮次」记录。
                         await self._memory.append_turn(
                             session_id,
                             "assistant",

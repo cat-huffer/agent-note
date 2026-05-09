@@ -32,6 +32,10 @@ class Reranker:
         if self._model is not None:
             return self._model
         try:
+            # CrossEncoder 是什么：
+            #一种 交叉编码器 模型：把「查询 + 文档」拼在一起送进同一个 Transformer，直接输出这对文本的相关性分数。
+            # 和「先分别编码 query/doc 再算相似度」的双塔（Bi-encoder）不同，Cross-Encoder 会看 query 与 doc 的联合上下文，通常 重排序更准，
+            # 但 算得更慢，适合在向量检索已经缩小候选集之后做 rerank。
             from sentence_transformers import CrossEncoder
         except ImportError as e:
             raise RuntimeError("请安装 sentence-transformers 以使用 Reranker") from e
@@ -56,6 +60,7 @@ class Reranker:
         def _sync_predict() -> list[float]:
             model = self._load_model()
             pairs = [(query, d.content) for d in documents]
+            # 交叉编码器对「查询–文档」对批量打分
             raw = model.predict(pairs)
             if hasattr(raw, "tolist"):
                 return list(raw.tolist())  # type: ignore[no-any-return]
@@ -71,6 +76,7 @@ class Reranker:
             raise RuntimeError("重排序分数数量与文档数量不一致")
 
         ranked = sorted(
+            # zip 是 Python 内置函数，会把多个可迭代对象按位置一对一对齐
             zip(documents, scores, strict=True),
             key=lambda x: float(x[1]),
             reverse=True,

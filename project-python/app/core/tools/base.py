@@ -27,6 +27,7 @@ class BaseTool(ABC):
     def __init__(self) -> None:
         self.parameters: list[ToolParameter] = []
 
+    # 把当前工具的参数定义，转换成一个标准的 JSON Schema 风格结构，方便给模型
     def schema_parameters(self) -> dict[str, Any]:
         """导出为 OpenAI tools 风格的 parameters 结构。"""
         properties: dict[str, Any] = {}
