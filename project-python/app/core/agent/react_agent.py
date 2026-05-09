@@ -19,22 +19,22 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 REACT_SYSTEM_PROMPT = """你是一个严谨的智能助手，必须使用 ReAct（推理+行动）方式回答问题。
 
-## 输出格式（严格遵守，每一步只输出一块内容）
+    ## 输出格式（严格遵守，每一步只输出一块内容）
 
-### 若需要调用工具
-先写思考，再写动作：
-Thought: <用中文简要说明你为什么需要下一步、打算做什么>
-Action: <工具名称，必须是可用工具列表中之一>
-Action Input: <JSON 对象，工具的参数>
+    ### 若需要调用工具
+    先写思考，再写动作：
+    Thought: <用中文简要说明你为什么需要下一步、打算做什么>
+    Action: <工具名称，必须是可用工具列表中之一>
+    Action Input: <JSON 对象，工具的参数>
 
-### 若已有足够信息可直接作答
-Thought: <简要总结依据>
-Final Answer: <面向用户的完整最终答案，使用用户使用的语言>
+    ### 若已有足够信息可直接作答
+    Thought: <简要总结依据>
+    Final Answer: <面向用户的完整最终答案，使用用户使用的语言>
 
-## 规则
-- 不要编造工具名称或 Observation；Observation 由系统在你输出 Action 后自动追加。
-- Action Input 必须是合法 JSON。
-- 若某工具返回错误，在下一步 Thought 中分析并决定是否换工具或向用户说明限制。
+    ## 规则
+    - 不要编造工具名称或 Observation；Observation 由系统在你输出 Action 后自动追加。
+    - Action Input 必须是合法 JSON。
+    - 若某工具返回错误，在下一步 Thought 中分析并决定是否换工具或向用户说明限制。
 """
 
 
@@ -45,17 +45,20 @@ def build_react_user_prompt(
 ) -> str:
     """构造单轮用户侧提示（含工具说明与历史轨迹）。"""
     return f"""## 用户问题
-{query}
+        {query}
 
-## 可用工具
-{tool_descriptions}
+        ## 可用工具
+        {tool_descriptions}
 
-## 已执行的步骤与观察（如有）
-{history_block}
+        ## 已执行的步骤与观察（如有）
+        {history_block}
 
-请根据当前信息，输出下一步：要么 Action + Action Input，要么 Final Answer。"""
+        请根据当前信息，输出下一步：要么 Action + Action Input，要么 Final Answer。
+    """
 
 
+# Protocol 是静态鸭子类型
+# 任何带 async def acomplete(self, messages: ..., **kwargs) -> str 的东西，都可以当成「可被 ReAct 调用的 LLM」来用。
 class LLMCallable(Protocol):
     """可被 ReAct 调用的最小 LLM 接口。"""
 
@@ -97,7 +100,7 @@ class AgentResult:
     error: Optional[str] = None
     trace_id: Optional[str] = None
 
-
+# 把自由文本里的 Thought / Action / Action Input / Final Answer 抽出来，转换为程序可消费的结构，顺便携带解析错误信息。
 def _parse_react_step(text: str) -> Dict[str, Any]:
     """
     从模型输出解析 Thought / Action / Action Input / Final Answer。
