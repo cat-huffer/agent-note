@@ -178,6 +178,7 @@ class MultiRetriever:
             return self._embed.embed_query(query)
 
         try:
+            # 将一段非结构化的文本（通常是用户的问题）转化为一个高维向量
             vector = await asyncio.to_thread(_sync_embed)
         except Exception as e:
             logger.exception("向量编码失败: {}", e)
@@ -190,6 +191,7 @@ class MultiRetriever:
             return self._search_milvus(vector, top_k)
 
         try:
+            # 在 Milvus 里按 top_k 做近邻搜索，并整理成 list[RetrievalResult]
             return await asyncio.to_thread(_sync_search)
         except Exception as e:
             logger.exception("Milvus 向量检索失败: {}", e)
