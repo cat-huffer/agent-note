@@ -401,4 +401,4 @@
 
 ---
 
-*文档版本：与 `{ROOT}/ai-agent-interview-guide/docs/03-开源项目学习笔记/README.md` 同路径维护。*
+*文档版本：与 `{ROOT}/agent-note/docs/03-开源项目学习笔记/README.md` 同路径维护。*

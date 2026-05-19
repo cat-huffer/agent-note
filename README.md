@@ -53,7 +53,7 @@
 ## 项目架构
 
 ```
-ai-agent-interview-guide/
+agent-note/
 ├── README.md                          # 本文件
 ├── docs/                              # 文档区
 │   ├── 00-学习路线图/                  # 从零开始的学习路线
